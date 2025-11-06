@@ -152,18 +152,39 @@ def api_check_plate(request):
 @login_required
 @require_http_methods(["GET"])
 def api_service_types(request):
-    """Return list of active service types and addons for UI checkboxes."""
+    """Return list of active service types, addons, and inventory items for UI."""
     try:
         svc_qs = ServiceType.objects.filter(is_active=True).order_by('name')
         service_types = [{'name': s.name, 'estimated_minutes': s.estimated_minutes or 0} for s in svc_qs]
         # include addons
-        from .models import ServiceAddon
+        from .models import ServiceAddon, InventoryItem
         addon_qs = ServiceAddon.objects.all().order_by('name')
         service_addons = [{'name': a.name, 'estimated_minutes': a.estimated_minutes or 0} for a in addon_qs]
-        return JsonResponse({'service_types': service_types, 'service_addons': service_addons})
+
+        # include inventory items with brands
+        items_qs = InventoryItem.objects.select_related('brand').filter(is_active=True).order_by('brand__name', 'name')
+        inventory_items = []
+        for item in items_qs:
+            brand_name = item.brand.name if item.brand else 'Unbranded'
+            inventory_items.append({
+                'id': item.id,
+                'name': item.name,
+                'brand': brand_name,
+                'quantity': item.quantity or 0
+            })
+
+        return JsonResponse({
+            'service_types': service_types,
+            'service_addons': service_addons,
+            'inventory_items': inventory_items
+        })
     except Exception as e:
         logger.error(f"Error fetching service types: {e}")
-        return JsonResponse({'service_types': [], 'service_addons': []}, status=500)
+        return JsonResponse({
+            'service_types': [],
+            'service_addons': [],
+            'inventory_items': []
+        }, status=500)
 
 
 @login_required
