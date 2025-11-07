@@ -325,16 +325,26 @@ def invoice_print(request, pk):
 def invoice_pdf(request, pk):
     """Generate and download invoice as PDF"""
     invoice = get_object_or_404(Invoice, pk=pk)
-    
+
     try:
         from django.template.loader import render_to_string
         from weasyprint import HTML, CSS
         import io
-        
-        html_string = render_to_string('tracker/invoice_print.html', {'invoice': invoice})
-        html = HTML(string=html_string)
+        import os
+
+        logo_left_path = os.path.join(os.path.dirname(__file__), '..', 'tracker', 'static', 'assets', 'images', 'logo', 'stm_logo.png')
+        logo_right_path = os.path.join(os.path.dirname(__file__), '..', 'tracker', 'static', 'assets', 'images', 'logo', 'wecare.png')
+
+        context = {
+            'invoice': invoice,
+            'logo_left_url': f'file://{os.path.abspath(logo_left_path)}',
+            'logo_right_url': f'file://{os.path.abspath(logo_right_path)}',
+        }
+
+        html_string = render_to_string('tracker/invoice_print.html', context)
+        html = HTML(string=html_string, base_url=request.build_absolute_uri('/'))
         pdf = html.write_pdf()
-        
+
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="Invoice_{invoice.invoice_number}.pdf"'
         return response
